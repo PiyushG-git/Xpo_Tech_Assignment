@@ -14,6 +14,15 @@ app.use(express.json());
 app.use('/', clusterRoutes);
 app.use('/ingest', ingestRoutes);
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'Welcome to the News Pulse API',
+    status: 'online',
+    version: '1.0.0'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
