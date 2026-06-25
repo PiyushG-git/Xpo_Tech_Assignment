@@ -42,7 +42,9 @@ logger = logging.getLogger(__name__)
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_ingestion() -> dict:
+from bson.objectid import ObjectId
+
+def run_ingestion(job_id: str | None = None) -> dict:
     """
     Run the full ingestion pipeline over all configured feeds.
 
@@ -86,7 +88,15 @@ def run_ingestion() -> dict:
         "failed": stats["articles_skipped_error"],
         "status": "completed",
     }
-    ingestion_jobs_col(db).insert_one(job_doc)
+    
+    if job_id:
+        ingestion_jobs_col(db).update_one(
+            {"_id": ObjectId(job_id)},
+            {"$set": job_doc}
+        )
+        job_doc["_id"] = ObjectId(job_id)
+    else:
+        ingestion_jobs_col(db).insert_one(job_doc)
 
     logger.info(
         "=== Ingestion complete in %.1fs | new=%d  dup=%d  err=%d ===",
@@ -113,7 +123,7 @@ def _process_feed(feed_config: dict, col, stats: dict) -> None:
     source_name: str = feed_config["name"]
     feed_url: str = feed_config["url"]
 
-    logger.info("── Processing feed: %s (%s)", source_name, feed_url)
+    logger.info("-- Processing feed: %s (%s)", source_name, feed_url)
 
     # ── 1. Parse RSS ──────────────────────────────────────────────────────────
     try:
