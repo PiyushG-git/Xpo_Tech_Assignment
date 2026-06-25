@@ -160,6 +160,27 @@ TF-IDF is purely lexical — it groups articles that share the same words, not t
 
 ---
 
+## Part 2 — Backend API
+
+### Architecture & Approach
+The backend is built with **Node.js, Express, and Mongoose**. It serves as the bridge between the MongoDB database and the Next.js/React frontend.
+
+1. **Mongoose Models:** Strict schema parity with the Python script (`Article`, `Cluster`, `IngestionJob`).
+2. **CORS & Middleware:** Pre-configured for local frontend development.
+3. **Python Orchestration:** Instead of complex child process management in Node, a small `pipeline.py` script orchestrates the ingestion and grouping. Node.js simply spawns this script asynchronously.
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/clusters` | Returns a lightweight list of all clusters (id, label, article_count, dates). |
+| `GET` | `/clusters/:id` | Returns a specific cluster fully populated with its articles, sorted chronologically. |
+| `GET` | `/timeline` | Returns data formatted specifically for the frontend charting library (Recharts). |
+| `POST` | `/ingest/trigger` | Creates a new `IngestionJob`, spawns the Python pipeline in the background, and returns the `jobId` immediately. |
+| `GET` | `/ingest/status/:jobId` | Returns `{"status": "running" | "completed" | "failed"}` for frontend polling. |
+
+---
+
 ## Database Schema (MongoDB)
 
 ### `articles` collection
