@@ -125,18 +125,14 @@ Open [http://localhost:3000](http://localhost:3000).
 | The Guardian | `https://www.theguardian.com/world/rss` |
 | New York Times | `https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml` |
 
-### How It Works
-1. **feedparser** fetches and parses each RSS feed
-2. **normalizer.py** handles format inconsistencies — different field names (`<description>` vs `<content:encoded>`), missing dates, inconsistent date formats
-3. **fetcher.py** downloads the full article page using a persistent **`requests.Session()`** for speed, and extracts body text via **trafilatura** (falls back to BeautifulSoup `<p>` extraction if trafilatura fails)
-4. A **SHA-256 hash of the URL** is used as the dedup key — MongoDB's unique index enforces no duplicates even across concurrent runs
-5. **Structured Logging** tracks every step of the pipeline for easy debugging in production
-6. Articles are stored in the `articles` collection with `cluster_id: null` (filled in by the grouper)
-
-### Key Design Decisions
-- **Re-runnable**: second run takes ~2 seconds (all hashes already in DB, zero new inserts)
-- **Graceful failures**: paywalled pages (NYT 403s) still save the article with RSS summary only — the pipeline never crashes
-- **Per-feed cap**: `MAX_ARTICLES_PER_FEED = 30` in `config.py` — set to `None` for unlimited
+### How Requirements Were Met
+1. **Multiple Sources:** Pulls live data from 4 major public RSS feeds (BBC, NPR, Guardian, NYT).
+2. **Format Inconsistencies:** `normalizer.py` handles different field names (`<description>` vs `<content:encoded>`), missing dates, and completely inconsistent date formats.
+3. **Full Article Extraction:** `fetcher.py` downloads the full article page using a persistent **`requests.Session()`** for speed. It extracts the main body text via **trafilatura**, and falls back to **BeautifulSoup** `<p>` tag extraction if trafilatura fails.
+4. **Graceful Failures:** Paywalled pages or network timeouts (e.g., NYT 403s) do not crash the pipeline. The article is simply saved with its RSS summary and a `body_status` of `SUMMARY_ONLY`.
+5. **Avoiding Duplicates:** A **SHA-256 hash of the canonical URL** is used as a unique index in MongoDB. This mathematically guarantees no duplicates are stored, even across concurrent runs.
+6. **Re-runnable:** The scraper can be run repeatedly. A second run takes only ~2 seconds because it simply checks the MongoDB hashes and skips existing articles, only processing genuinely new content.
+7. **Production Ready:** Implements **Structured Logging** to track every step of the pipeline and creates an `ingestion_jobs` receipt in the database upon completion.
 
 ---
 
