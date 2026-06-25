@@ -8,11 +8,11 @@ Built as part of the **XPONENTIUM INDIA Full-Stack Developer Internship Assessme
 
 ##  Live Links
 
-| Component | URL |
-|---|---|
-|  Frontend | _Coming soon (Vercel)_ |
-|  Backend API | _Coming soon (Render / Railway)_ |
-|  Video Walkthrough | _Coming soon_ |
+| Component | URL | Notes |
+|---|---|---|
+|  Frontend | [https://xpo-tech-assignment.vercel.app/](https://xpo-tech-assignment.vercel.app/) | Live URL that works when opened cold |
+|  Backend API | [https://xpo-tech-assignment.onrender.com](https://xpo-tech-assignment.onrender.com) | May have standard free-tier cold-start delays |
+|  Video Walkthrough | _[Paste Loom URL here]_ | 2-3 minute review |
 
 ---
 
@@ -169,19 +169,23 @@ The backend is built with **Node.js, Express, and Mongoose**. It serves as the b
 2. **CORS & Middleware:** Pre-configured for local frontend development.
 3. **Python Orchestration:** Instead of complex child process management in Node, a small `pipeline.py` script orchestrates the ingestion and grouping. Node.js simply spawns this script asynchronously.
 
-### API Endpoints
+### API Endpoints & Design Decisions
+
+The API implements **reasonable error handling, input validation, and correct status codes (400/404/500 used appropriately)** across all endpoints.
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/clusters` | Returns a lightweight list of all clusters (id, label, article_count, dates). |
-| `GET` | `/clusters/:id` | Returns a specific cluster fully populated with its articles, sorted chronologically. |
-| `GET` | `/timeline` | Returns data formatted specifically for the frontend charting library (Recharts). |
-| `POST` | `/ingest/trigger` | Creates a new `IngestionJob`, spawns the Python pipeline in the background, and returns the `jobId` immediately. |
-| `GET` | `/ingest/status/:jobId` | Returns `{"status": "running" | "completed" | "failed"}` for frontend polling. |
+| `GET` | `/clusters/:id` | Returns a specific cluster fully populated with its articles, sorted chronologically. Returns `404` if not found. |
+| `GET` | `/timeline` | **Sensible shape for timeline data**: Returns `[ { id, label, start, end, articleCount, intensity } ]`. Charting libraries need start/end timestamps and magnitudes, not just raw article lists. |
+| `POST` | `/ingest/trigger` | Creates a new `IngestionJob`, spawns the Python pipeline in the background, and returns the `jobId` `201 Created` immediately. |
+| `GET` | `/ingest/status/:jobId` | Returns `{"status": "running" | "completed" | "failed"}` for frontend polling. Returns `404` if job invalid. |
 
 ---
 
 ## Database Schema (MongoDB)
+
+A working connection to MongoDB Atlas is established. **Configuration is done entirely via environment variables — there are no hardcoded DB URLs or secrets in the code.**
 
 ### `articles` collection
 ```json
@@ -235,25 +239,26 @@ The backend is built with **Node.js, Express, and Mongoose**. It serves as the b
 
 ---
 
-## Deployment
+## Deployment: What runs where, and why
 
 | Component | Platform | Notes |
 |---|---|---|
-| Frontend | Vercel | Auto-deploys from `frontend/` on push to `main` |
-| Backend API | Render | Node.js web service, free tier |
-| Python pipeline | Render Cron Job | Scheduled daily; also triggerable via `POST /ingest/trigger` |
-| Database | MongoDB Atlas M0 | Free tier, hosted in same region as backend |
+| Frontend | Vercel | **Why:** Best-in-class global CDN for Next.js/Vite SPAs. Auto-deploys from `frontend/` on push to `main`. |
+| Backend & Pipeline | Render | **Why:** We need a Node.js API that can trigger a Python script via `spawn()`. Render allows us to use a custom `Dockerfile` to create a hybrid Node.js + Python3 environment. |
+| Database | MongoDB Atlas M0 | **Why:** Standard free-tier NoSQL database, easily hosted in the same region as the Render backend for low latency. |
 
-Environment variables are configured on each hosting platform — **no secrets are committed to this repo**.
+**Environment variables are configured directly on the hosting platforms. No secrets are committed to the repository.**
 
 ---
 
-## Assumptions Made
+## Ambiguities & Assumptions Made
 
-- Articles without a `published_at` date are stored with `null` and excluded from the timeline range calculation
-- NYT articles that return HTTP 403 (paywall) are still stored — the RSS summary is enough for clustering; body is `null`
-- "Same story across outlets" cross-source dedup is not implemented (marked as stretch goal in the spec)
-- The DBSCAN `eps` parameter of `0.6` was chosen empirically by inspecting cluster quality on the first test run
+*As per the assignment prompt: "If something is ambiguous, make a reasonable assumption, note it in your README, and keep moving."*
+
+- **Missing Dates**: Articles without a `published_at` date are stored with `null` and excluded from the timeline range calculation.
+- **Paywalls**: NYT articles that return HTTP 403 (paywall) are still stored — the RSS summary is enough for clustering; body is stored as `null`.
+- **Cross-Source Merging**: "Same story across outlets" cross-source dedup is a known hard problem and is marked as an optional stretch goal, so it was not implemented to focus on core functionality.
+- **DBSCAN Parameters**: The DBSCAN `eps` parameter of `0.6` was chosen empirically by inspecting cluster quality on the first test run, rather than via mathematical grid search.
 
 ---
 
