@@ -142,21 +142,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Part 1B — Topic Grouping
 
-### Approach: TF-IDF + Cosine Similarity (Option B)
+### Approach: DBSCAN + TF-IDF (Option B)
 
 **Why TF-IDF over keyword overlap?**  
 TF-IDF weights rare, meaningful terms more heavily than common ones — words like "elections" score higher than "said". This produces more coherent clusters than raw word-overlap counting.
 
 **How articles are grouped:**
-1. Compute TF-IDF vectors over `title + summary` text (full body where available)
-2. Calculate pairwise cosine similarity between all article vectors
-3. Group articles with similarity >= 0.25 into the same cluster using a graph-based connected-components approach
-4. Label each cluster using the top 3 TF-IDF terms
+1. Compute TF-IDF vectors over `title + title + summary + body` text. Doubling the title gives the most signal-rich part of the article more weight.
+2. Group similar articles using **DBSCAN** clustering with a cosine distance metric. DBSCAN automatically discovers the number of topics and marks unrelated articles as noise ("Uncategorized").
+3. For each cluster, compute the centroid (mean vector) and pick the top 3 TF-IDF terms to generate a highly precise, human-readable label (e.g., `Venezuela • Earthquakes • Caracas`).
 
 **Parameters:**
-- Similarity threshold: `0.25` — below this, articles are treated as different topics
-- Min cluster size: `2` — singletons form their own "Unclustered" group
-- Max features: `5000` TF-IDF terms
+- DBSCAN eps: `0.6` (groups articles with cosine similarity > 0.4)
+- DBSCAN min_samples: `2` (singletons are marked as noise)
+- TF-IDF max_features: `5000` terms
+- TF-IDF min_df: `2` (drops noise words appearing in only 1 article)
+- TF-IDF max_df: `0.85` (drops overly common words appearing in >85% of articles)
 
 **Known limitation:**  
 TF-IDF is purely lexical — it groups articles that share the same words, not the same concepts. Two articles about the same event written with different vocabulary (e.g. one says "ceasefire", another says "peace agreement") may land in separate clusters. A sentence-embedding model (e.g. `sentence-transformers`) would fix this but was out of scope.
@@ -235,7 +236,7 @@ Environment variables are configured on each hosting platform — **no secrets a
 - Articles without a `published_at` date are stored with `null` and excluded from the timeline range calculation
 - NYT articles that return HTTP 403 (paywall) are still stored — the RSS summary is enough for clustering; body is `null`
 - "Same story across outlets" cross-source dedup is not implemented (marked as stretch goal in the spec)
-- The TF-IDF similarity threshold of `0.25` was chosen empirically by inspecting cluster quality on the first test run
+- The DBSCAN `eps` parameter of `0.6` was chosen empirically by inspecting cluster quality on the first test run
 
 ---
 
