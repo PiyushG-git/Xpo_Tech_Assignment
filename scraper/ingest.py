@@ -25,7 +25,7 @@ from pymongo.errors import DuplicateKeyError
 
 from config import MAX_ARTICLES_PER_FEED, RSS_FEEDS
 from fetcher import fetch_article_body
-from models import articles_col, build_article_doc, get_db, init_db, make_url_hash
+from models import articles_col, build_article_doc, get_db, init_db, make_url_hash, ingestion_jobs_col
 from normalizer import normalize_entry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -78,6 +78,16 @@ def run_ingestion() -> dict:
     finished_at = datetime.now(timezone.utc)
     elapsed = (finished_at - started_at).total_seconds()
 
+    job_doc = {
+        "started_at": started_at,
+        "ended_at": finished_at,
+        "articles_inserted": stats["articles_new"],
+        "duplicates": stats["articles_skipped_duplicate"],
+        "failed": stats["articles_skipped_error"],
+        "status": "completed",
+    }
+    ingestion_jobs_col(db).insert_one(job_doc)
+
     logger.info(
         "=== Ingestion complete in %.1fs | new=%d  dup=%d  err=%d ===",
         elapsed,
@@ -87,6 +97,7 @@ def run_ingestion() -> dict:
     )
 
     return {
+        "job_id": str(job_doc.get("_id", "")),
         **stats,
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
@@ -148,8 +159,8 @@ def _process_entry(entry, source_name: str, col, stats: dict) -> None:
 
     # ── Full article body fetch ───────────────────────────────────────────────
     logger.info("  FETCH body: %s", url[:80])
-    body = fetch_article_body(url)
-    if body is None:
+    fetch_result = fetch_article_body(url)
+    if fetch_result["body"] is None:
         logger.debug("  Body fetch failed — storing with summary only: %s", url[:60])
 
     # ── Build document ────────────────────────────────────────────────────────
@@ -157,7 +168,9 @@ def _process_entry(entry, source_name: str, col, stats: dict) -> None:
         url=url,
         title=normalised["title"],
         summary=normalised["summary"],
-        body=body,
+        body=fetch_result["body"],
+        body_status=fetch_result["body_status"],
+        extractor=fetch_result["extractor"],
         source=source_name,
         published_at=normalised["published_at"],
     )
@@ -180,6 +193,6 @@ def _process_entry(entry, source_name: str, col, stats: dict) -> None:
 
 if __name__ == "__main__":
     summary = run_ingestion()
-    print("\nIngestion summary:")
+    logger.info("Ingestion summary:")
     for key, value in summary.items():
-        print(f"  {key}: {value}")
+        logger.info("  %s: %s", key, value)

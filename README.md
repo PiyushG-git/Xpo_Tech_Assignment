@@ -128,9 +128,10 @@ Open [http://localhost:3000](http://localhost:3000).
 ### How It Works
 1. **feedparser** fetches and parses each RSS feed
 2. **normalizer.py** handles format inconsistencies — different field names (`<description>` vs `<content:encoded>`), missing dates, inconsistent date formats
-3. **fetcher.py** downloads the full article page and extracts body text via **trafilatura** (falls back to BeautifulSoup `<p>` extraction if trafilatura fails)
+3. **fetcher.py** downloads the full article page using a persistent **`requests.Session()`** for speed, and extracts body text via **trafilatura** (falls back to BeautifulSoup `<p>` extraction if trafilatura fails)
 4. A **SHA-256 hash of the URL** is used as the dedup key — MongoDB's unique index enforces no duplicates even across concurrent runs
-5. Articles are stored in the `articles` collection with `cluster_id: null` (filled in by the grouper)
+5. **Structured Logging** tracks every step of the pipeline for easy debugging in production
+6. Articles are stored in the `articles` collection with `cluster_id: null` (filled in by the grouper)
 
 ### Key Design Decisions
 - **Re-runnable**: second run takes ~2 seconds (all hashes already in DB, zero new inserts)
@@ -173,6 +174,8 @@ TF-IDF is purely lexical — it groups articles that share the same words, not t
   "title": "Article headline",
   "summary": "Short RSS blurb",
   "body": "Full article text or null",
+  "body_status": "SUCCESS",
+  "extractor": "trafilatura",
   "source": "BBC News",
   "published_at": "2026-06-25T08:00:00Z",
   "ingested_at": "2026-06-25T07:47:37Z",
@@ -193,11 +196,24 @@ TF-IDF is purely lexical — it groups articles that share the same words, not t
 }
 ```
 
+### `ingestion_jobs` collection
+```json
+{
+  "_id": "ObjectId",
+  "started_at": "2026-06-25T07:47:37Z",
+  "ended_at": "2026-06-25T07:50:52Z",
+  "articles_inserted": 93,
+  "duplicates": 12,
+  "failed": 0,
+  "status": "completed"
+}
+```
+
 **Indexes:**
 - `articles.url_hash` — unique (dedup key)
 - `articles.source` — filtering by source in the UI
 - `articles.cluster_id` — joining clusters to articles
-- `articles.published_at` — timeline ordering
+- `articles.published_at` — timeline ordering (-1 / descending)
 
 ---
 

@@ -35,15 +35,18 @@ _HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+_session = requests.Session()
+_session.headers.update(_HEADERS)
 
-def fetch_article_body(url: str) -> str | None:
+
+def fetch_article_body(url: str) -> dict:
     """
-    Download *url* and return the main body text (plain text, no HTML).
-    Returns None on any error so callers can degrade gracefully.
+    Download *url* and return the main body text (plain text, no HTML)
+    along with extraction status and extractor used.
     """
     html = _download_html(url)
     if not html:
-        return None
+        return {"body": None, "body_status": "SUMMARY_ONLY", "extractor": None}
 
     # ── Primary: trafilatura ──────────────────────────────────────────────────
     body = trafilatura.extract(
@@ -53,16 +56,16 @@ def fetch_article_body(url: str) -> str | None:
         no_fallback=False,
     )
     if body and len(body.strip()) > 100:
-        return body.strip()
+        return {"body": body.strip(), "body_status": "SUCCESS", "extractor": "trafilatura"}
 
     # ── Fallback: grab all <p> text with BeautifulSoup ────────────────────────
     body = _bs4_extract(html)
     if body and len(body.strip()) > 100:
         logger.debug("trafilatura failed for %s; used BS4 fallback", url)
-        return body.strip()
+        return {"body": body.strip(), "body_status": "SUCCESS", "extractor": "beautifulsoup"}
 
     logger.debug("Could not extract useful body from %s", url)
-    return None
+    return {"body": None, "body_status": "SUMMARY_ONLY", "extractor": None}
 
 
 # ── Private helpers ───────────────────────────────────────────────────────────
@@ -71,9 +74,8 @@ def _download_html(url: str) -> str | None:
     """HTTP GET with retries; returns raw HTML or None."""
     for attempt in range(1, FETCH_RETRIES + 2):  # +2 so FETCH_RETRIES=2 → 3 attempts
         try:
-            resp = requests.get(
+            resp = _session.get(
                 url,
-                headers=_HEADERS,
                 timeout=REQUEST_TIMEOUT,
                 allow_redirects=True,
             )

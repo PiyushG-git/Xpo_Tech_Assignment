@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from pymongo import ASCENDING, MongoClient
+from pymongo import ASCENDING, DESCENDING, MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
 
@@ -58,6 +58,10 @@ def clusters_col(db: Database) -> Collection:
     return db["clusters"]
 
 
+def ingestion_jobs_col(db: Database) -> Collection:
+    return db["ingestion_jobs"]
+
+
 # ── Index bootstrap ───────────────────────────────────────────────────────────
 
 def init_db() -> None:
@@ -76,7 +80,7 @@ def init_db() -> None:
     # Useful query indexes for the API
     arts.create_index([("source", ASCENDING)], name="idx_source")
     arts.create_index([("cluster_id", ASCENDING)], name="idx_cluster_id")
-    arts.create_index([("published_at", ASCENDING)], name="idx_published_at")
+    arts.create_index([("published_at", DESCENDING)], name="idx_published_at")
 
     # ── clusters collection ───────────────────────────────────────────────────
     clus = clusters_col(db)
@@ -91,6 +95,8 @@ def build_article_doc(
     title: str,
     summary: str | None,
     body: str | None,
+    body_status: str,
+    extractor: str | None,
     source: str,
     published_at: datetime | None,
 ) -> dict:
@@ -105,6 +111,8 @@ def build_article_doc(
         title       : str
         summary     : str | None   # short RSS blurb
         body        : str | None   # full article body (None if fetch failed)
+        body_status : str          # SUCCESS or SUMMARY_ONLY
+        extractor   : str | None   # trafilatura or beautifulsoup
         source      : str          # "BBC News", "NPR", etc.
         published_at: datetime | None   # UTC-aware
         ingested_at : datetime          # UTC-aware, set at insertion time
@@ -117,6 +125,8 @@ def build_article_doc(
         "title": title,
         "summary": summary or "",
         "body": body,
+        "body_status": body_status,
+        "extractor": extractor,
         "source": source,
         "published_at": published_at,
         "ingested_at": datetime.now(timezone.utc),
