@@ -13,7 +13,7 @@ exports.triggerIngestion = async (req, res) => {
     const scriptPath = process.env.PYTHON_SCRIPT_PATH || path.resolve(__dirname, '../../../scraper/pipeline.py');
     
     // We do not await this spawn so the API returns immediately
-    const pythonProcess = spawn('python', [scriptPath, job._id.toString()], {
+    const pythonProcess = spawn('python3', [scriptPath, job._id.toString()], {
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     });
 

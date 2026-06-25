@@ -48,16 +48,21 @@ exports.getClusterById = async (req, res) => {
 exports.getTimeline = async (req, res) => {
   try {
     const clusters = await Cluster.find({ earliest_at: { $ne: null } })
-      .select('_id label earliest_at latest_at article_count');
+      .populate('article_ids', 'source')
+      .select('_id label earliest_at latest_at article_count article_ids');
       
-    const formatted = clusters.map(c => ({
-      id: c._id,
-      label: c.label,
-      start: c.earliest_at,
-      end: c.latest_at,
-      articleCount: c.article_count,
-      intensity: c.article_count
-    }));
+    const formatted = clusters.map(c => {
+      const sources = [...new Set(c.article_ids.map(a => a.source))];
+      return {
+        id: c._id,
+        label: c.label,
+        start: c.earliest_at,
+        end: c.latest_at,
+        articleCount: c.article_count,
+        intensity: c.article_count,
+        sources: sources
+      };
+    });
     
     res.json(formatted);
   } catch (error) {
