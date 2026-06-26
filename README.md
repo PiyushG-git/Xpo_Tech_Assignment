@@ -12,7 +12,7 @@ Built as part of the **XPONENTIUM INDIA Full-Stack Developer Internship Assessme
 |---|---|---|
 |  Frontend | [https://xpo-tech-assignment.vercel.app/](https://xpo-tech-assignment.vercel.app/) | Live URL that works when opened cold |
 |  Backend API | [https://xpo-tech-assignment.onrender.com](https://xpo-tech-assignment.onrender.com) | May have standard free-tier cold-start delays |
-|  Video Walkthrough | _[Paste Loom URL here]_ | 2-3 minute review |
+|  Video Walkthrough | [https://drive.google.com/file/d/1VNaVrk4b2boR_XTlWTY3F5dA3ZmSzQ9l/view?usp=sharing](https://drive.google.com/file/d/1VNaVrk4b2boR_XTlWTY3F5dA3ZmSzQ9l/view?usp=sharing) | 2-3 minute review |
 
 ---
 
